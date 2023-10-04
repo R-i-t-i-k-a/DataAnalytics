@@ -2,6 +2,24 @@ const express=require("express");
 const _=require("lodash");
 const axios=require("axios");
 const app=express();
+let blogData=null;
+async function fetchBlogData() {
+    try {
+      const response = await axios.get(
+        'https://intent-kit-16.hasura.app/api/rest/blogs',
+        {
+          headers: {
+            'x-hasura-admin-secret':
+              '32qR4KmXOIpsGPQKMqEJHGJS27G5s7HdSKO3gdtQd2kv5e852SiYwWNfxkZOBuQ6',
+          },
+        }
+      );
+      blogData = response.data;
+    } catch (error) {
+      console.error('error fetching blog data: ', error.message);
+      throw error; // Propagate the error
+    }
+  }
 
 //step 4 se karna he....try ejs and body parser maybe. line 13
 app.get("/",function(req,res){
@@ -9,9 +27,22 @@ app.get("/",function(req,res){
 })
 
 app.get("/api/blog-search",function(req,res){
-    const {query}=req.query;
-    res.send("Work to be done")
-    //work to be done here.
+    const query=req.query.query;
+    if (!query || typeof query !== 'string') {
+        return res.status(400).json({ error: 'Invalid query parameter' });
+      }
+    
+      if (blogData) {
+        // If blogData is available, use it for searching
+        const matchingBlogs = blogData.blogs.filter((blog) =>
+          blog.title.toLowerCase().includes(query.toLowerCase())
+        );
+        res.json(matchingBlogs);
+      } else {
+        //if blog data not available, fetch it and then do the search functionality
+        fetchBlogData();
+        res.redirect('/api/blog-search?query='+query);
+      }
 })
 
 app.get("/api/blog-stats",async(req,res)=>{
@@ -25,8 +56,7 @@ app.get("/api/blog-stats",async(req,res)=>{
                 },
             }
         );
-        const blogData=response.data;
-
+        blogData=response.data;
         //data analysis using lodash
         const totalBlogs = _.size(blogData.blogs); //getting total number of blogs
         const longestBlog = _.maxBy(blogData.blogs, function(l){return _.size(l.title)}); //finding the blog with the longest title
